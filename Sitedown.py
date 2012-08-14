@@ -1,4 +1,4 @@
-import sys, os, urllib2, re, datetime, md5
+import sys, os, urllib2, re, datetime, hashlib
 from urlparse import urlparse
 
 try:
@@ -26,16 +26,12 @@ class Sitedown:
 	# A list of errors that have occurred during the process.
 	errors = []
 
-	def __init__(self, root_url, output_dir = None):
+	def __init__(self, root_url, output_dir = '.'):
 
 		self.root_url = root_url
 		self.root_url_parsed = urlparse(root_url)
 
 		self.output_dir = output_dir
-
-		if not self.output_dir:
-			now = datetime.datetime.now()
-			self.output_dir = '.'+Sitedown.DIR_SEP+self.root_url_parsed.netloc+'_'+now.year+now.month+now.day+'_'+now.hour+now.minute+now.second+now.microsecond
 
 		# A dictionary of all the resourcees
 		self.resources = []
@@ -89,16 +85,26 @@ class Sitedown:
 		types = {'script':'src', 'link':'href', 'img':'src'}
 
 		for state in self.search.get_visited_states():
+
 			soup = state.soup
+
+			# Look through HTML file for resources and convert link paths.
 			for t in types:
 				attr = types[t]
 				resources = soup.find_all(t)
 				for r in resources:
 					if attr in r:
 						url = r[attr]
-						new_url = self.__convert_path(url)
+						new_url = Sitedown.get_save_location(url)
 						self.to_download[url] = new_url
 						r[attr] = new_url
+
+			# Get the HTML with the modified contents and save it
+			original_url = state.url
+			url_parsed = urlparse(original_url)
+			file_name, file_ext = os.path.splitext(url_parsed.path)
+			new_page_contents = soup.renderContents()
+			Sitedown.save_resource('./' + file_name + '.html', new_page_contents)
 
 
 	def __download_css(self, css):
@@ -157,17 +163,17 @@ class Sitedown:
 		# Now we want to make sure that url is "within" the same dir as the root_url.
 		# Example:
 		# Root URL = http://example.com/a/b/
-		# Then http://example.com/a/b/c.html is within root, but /a/c/b.html is not.
+		# Then http://example.com/a/b/c.html is within root, but /a/b.html is not.
+		# Protocol is irrelevant.
 
-
-		root_path = root_url_parsed.path.lstrip('/')
+		root_path = root_url_parsed.path.lstrip(Sitedown.DIR_SEP)
 
 		if not root_path:
 			return True
 
-		other_path = url_parsed.path.lstrip('/')
+		other_path = url_parsed.path.lstrip(Sitedown.DIR_SEP)
 
-		root_path_deepest_dir = root_path[:root_path.rfind('/')]		
+		root_path_deepest_dir = root_path[:root_path.rfind(Sitedown.DIR_SEP)]		
 
 		return other_path.startswith(root_path_deepest_dir)
 
@@ -183,19 +189,19 @@ class Sitedown:
 
 	def get_save_location(original_url):
 
-	url_parsed = urlparse(original_url)
-	path = url_parsed.path
+		url_parsed = urlparse(original_url)
+		path = url_parsed.path
 
-	if not path:
-		return ''
+		if not path:
+			return ''
 
-	if path[0] == self.DIR_SEP and path[1:]:
-		path = path[1]
+		if path[0] == Sitedown.DIR_SEP and path[1:]:
+			path = path[1]
 
-	file_name, file_ext = os.path.splitext(path)
-	new_file_name = hashlib.md5(file_name).hexdigest()
+		file_name, file_ext = os.path.splitext(path)
+		new_file_name = hashlib.md5(file_name).hexdigest()
 
-	return self.RESOURCES_DIR+new_file_name+file_ext
+		return Sitedown.RESOURCES_DIR+new_file_name+file_ext
 
 	def save_resource(save_location, contents):
 
@@ -233,6 +239,7 @@ class Sitedown:
 			self.G = G
 			self.parent = parent
 
+
 		def successors(self):
 			'''This is the function called upon visiting a node, when we want to get what
 			states can be reached by this one. This is essentially extracting all the links'''
@@ -265,7 +272,7 @@ class Sitedown:
 				url = a['href']
 
 				# Only a successor if it's on the same website 
-				if self.is_same_website(self.root_url, url):
+				if self.__is_same_website(url):
 					new_state = Sitedown.State(url, new_G, self)
 					succs.append(new_state)
 
