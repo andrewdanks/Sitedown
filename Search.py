@@ -1,7 +1,7 @@
 
 class Search:
 
-	(DEPTH_FIRST, BREADTH_FIRST, ASTAR, IDASTAR) = (1, 2, 3, 4)
+	(DEPTH_FIRST, BREADTH_FIRST, ASTAR) = (1, 2, 3)
 
 	NULL_HEURISTIC = lambda N: 0
 
@@ -19,25 +19,13 @@ class Search:
 		self.method = method
 		self.state = init_state
 		self.goal = goal_fn
-		self.heuristic = heuristic_fn
-		self.visit = visit_fn
-		
+		self.heuristic = heuristic_fn		
 		self.new_node = new_node
-
 		self.cycle_check = True
 		self.verbose = False
 
 		if self.cycle_check:
 			self.cycle_check_hash = {}
-
-	def get_method(self):
-
-		return self.method
-
-	def set_method(self, new_method):
-
-		if 1 <= new_method and new_method <= 4:
-			self.meth
 
 	def cycle_check_on(self):
 		self.cycle_check = True
@@ -95,7 +83,7 @@ class Search:
 				self.open = []
 				Node.compare_type = Node.COMPARE_HG
 				self.insert = lambda N: heapq.heappush(self.open, N)
-				self.extract = lambda: heapq.heappop(self.open)
+				self.extract = heapq.heappop(self.open)
 			elif method == Search.BREADTH_FIRST:
 				self.open = deque()
 				self.insert = self.open.append
